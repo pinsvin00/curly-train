@@ -1,3 +1,7 @@
+
+use crate::vector::Vector2i;
+use crate::utils::{ParseInfo, HandShakeInfo};
+
 pub const PROTO_VER: &str = "1.00";
 pub struct ConnectionInfo<'a> {
     proto_ver: &'a str,
@@ -6,8 +10,8 @@ pub struct ConnectionInfo<'a> {
     ball_speed: Vector2i,
 }
 
-pub impl<'a> ConnectionInfo<'a> {
-    fn new(data_raw: &'a String) -> ParseInfo<ConnectionInfo> {
+impl<'a> ConnectionInfo<'a> {
+    pub fn new(data_raw: &'a String) -> ParseInfo<ConnectionInfo> {
         let data : Vec<&str> = data_raw.split(';').collect();
 
         if data.len() < 4 {

@@ -26,4 +26,16 @@ pub fn get(array: & Vec<Vec<char>>, x: usize, y: usize) -> char {
     return '!';
 }
 
+pub enum ParseInfo<T> {
+    Ok(T),
+    Err,
+}
 
+
+pub enum HandShakeInfo {
+    ProtocolVer = 0,
+    ConnectorIP = 1,
+    PaddleSpeed = 2,
+    BallSpeedX  = 3,
+    BallSpeedY  = 4,
+}

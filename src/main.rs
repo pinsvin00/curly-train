@@ -16,7 +16,13 @@ use rect::Rectangle;
 mod grid;
 use grid::Grid;
 
-use std::net::{TcpListener, TcpStream};
+mod connectioninfo;
+mod gameinfo;
+
+mod connection;
+use connection::{Connection};
+
+
 // for trait
 
 mod game;
@@ -64,9 +70,13 @@ fn main() {
 
     println!("SUPER MEGA GIGA ULTRA PETA PONG SMGUPP!");
 
+    let mut host = convert_input_yn("HOST? Y/N");
+    if host  {
 
-    let listener = TcpListener::bind("127.0.0.1:80");
-    // let mut easy = convert_input_yn("Do you wish to play in easy mode? Y/N");
+    }
+    else {
+
+    }
     // let mut solo = convert_input_yn("Do you have a friend to play with? Y/N");
 
     let mut game = Game::new(X_SIZE, Y_SIZE);
