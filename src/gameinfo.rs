@@ -22,6 +22,14 @@ fn get_info_split(info_split : &Vec<&str>, index: i16) -> i16 {
     return info_split[index as usize].parse::<i16>().unwrap();
 }
 
+impl Copy for GameInfo {}
+
+impl Clone for GameInfo  {
+    fn clone(&self) -> GameInfo{
+        *self
+    }
+}
+
 impl GameInfo {
     fn new() -> GameInfo {
         return GameInfo {
@@ -34,7 +42,7 @@ impl GameInfo {
             ball_speed: Vector2i {
                 x: 0,
                 y: 0,
-            }
+            },
         };
 
     }

@@ -4,6 +4,7 @@ use crate::Rectangle;
 use crate::Grid;
 use crate::Ball;
 use crate::Vector2i;
+use crate::Connection;
 
 use crate::Drawable;
 
@@ -30,7 +31,6 @@ pub struct Game {
 
     stdin : termion::input::Keys<termion::AsyncReader>,
     stdout: termion::raw::RawTerminal<std::io::Stdout>,
-
 
 }
 
@@ -75,7 +75,6 @@ impl Game {
             score: vec![0,0],
         } 
     }
-
     fn clear(&self) { 
         print!("{}", termion::clear::All);
     }
@@ -110,7 +109,9 @@ impl Game {
 
         if let Some(Ok(key)) = input {
             match key {
-                termion::event::Key::Char('q') => self.end(),
+                termion::event::Key::Char('q') => {
+                    self.end()
+                },
                 termion::event::Key::Up => {
                     self.paddle1.move_paddle(-1);
                 },
@@ -153,7 +154,8 @@ impl Game {
     }
 
 
-    pub fn loop_logic(&mut self) { 
+    pub fn loop_logic(&mut self) {
+
         self.clear();
 
         self.process_keys();

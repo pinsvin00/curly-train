@@ -10,18 +10,20 @@ use crate::gameinfo::GameInfo;
 use crate::utils::ParseInfo;
 
 const PROTO_VER : &str = "1.0.0";
-pub struct Connection<'a> {
+pub struct Connection {
     reader: Option<BufReader<TcpStream>>,
     stream: Option<TcpStream>,
     ip_addr: Option<String>,
     listening: bool,
-    conn_info: Option<ConnectionInfo<'a>>,
-    curr_game_info: Option<GameInfo>
+    conn_info: Option<ConnectionInfo>,
+    pub curr_game_info: Option<GameInfo>,
+    thread_handle: Option<std::thread::JoinHandle<()>>,
 }
 
-impl<'a> Connection<'a> {
-    fn new(ip_addr: String) -> Option<Connection<'a>> {
+impl Connection {
+    pub fn connector(ip_addr: String) -> Option<Connection> {
         return Some(Self {
+            thread_handle: None,
             ip_addr : Some(ip_addr),
             conn_info : None,
             curr_game_info : None,
@@ -31,7 +33,19 @@ impl<'a> Connection<'a> {
         })
     }
 
-    pub fn acquire_connectin(&mut self) {
+    pub fn listener() -> Connection {
+        return Self {
+            thread_handle: None,
+            ip_addr: None,
+            curr_game_info: None,
+            conn_info: None,
+            listening: true,
+            reader: None,
+            stream: None,
+        }
+    }
+
+    pub fn acquire(&mut self) {
         if !self.listening { 
             let addr = self.ip_addr.as_ref();
             self.stream = Some(TcpStream::connect(addr.unwrap()).unwrap());
@@ -54,6 +68,8 @@ impl<'a> Connection<'a> {
 
         stream.write(conn_data.as_bytes()).unwrap();
 
+        let conn = ConnectionInfo::new(conn_data);
+
         let mut response = String::new();
         reader.read_line(&mut response);
         response.pop();
@@ -61,11 +77,11 @@ impl<'a> Connection<'a> {
         if response == "OK" {
             println!("Connection sucesfully establisehd...");
         } else {
-            println!("Connection failed! Server rseponded with {}", response);
+            println!("Connection failed! Server responded with {}", response);
             return; 
         }
 
-        let conn = ConnectionInfo::new(&conn_data);
+
         match conn {
             ParseInfo::Ok(conn_i) => {
                 self.conn_info = Some(conn_i);             
@@ -77,7 +93,7 @@ impl<'a> Connection<'a> {
     }
     
     pub fn game_tick(&mut self) {
-        let packet = String::from("sussy baka");
+        let packet = String::from("sussy baka\n");
         let mut stream = self.stream.as_ref().unwrap();
         let mut reader = BufReader::new(stream);
 
