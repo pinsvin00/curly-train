@@ -1,6 +1,6 @@
 use crate::X_SIZE;
 use crate::Y_SIZE;
-
+use std::io::stdout;
 use crate::Vector2i;
 
 pub fn is_position_valid(grid : &Vec<Vec<char>>, position: Vector2i) -> bool {
@@ -24,6 +24,15 @@ pub fn get(array: & Vec<Vec<char>>, x: usize, y: usize) -> char {
         return array[x][y];
     }
     return '!';
+}
+
+pub fn switch_to_normal() {
+    print!("Switching back terminal mode to normal...\r\n");
+    print!(
+        "{}{}\r\n",
+        termion::cursor::Show,
+        termion::clear::AfterCursor
+    );
 }
 
 pub enum ParseInfo<T> {

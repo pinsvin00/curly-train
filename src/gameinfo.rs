@@ -8,6 +8,7 @@ pub struct GameInfo {
     pub paddle2_pos: i16,
     pub ball_pos: Vector2i,
     pub ball_speed: Vector2i,
+    pub end_game: bool,
 }
 
 enum GameInfoIndex { 
@@ -44,6 +45,7 @@ impl GameInfo {
                 x: 0,
                 y: 0,
             },
+            end_game: false,
         };
     }
 
@@ -56,7 +58,7 @@ impl GameInfo {
         self.ball_pos.x = get_info_split(&info_split, GameInfoIndex::BallPosX as i16); 
         self.ball_pos.y = get_info_split(&info_split, GameInfoIndex::BallPosY as i16);
 
-        self.ball_speed.x = get_info_split(&info_split, GameInfoIndex::BallSpeedY as i16); 
+        self.ball_speed.x = get_info_split(&info_split, GameInfoIndex::BallSpeedX as i16); 
         self.ball_speed.y = get_info_split(&info_split, GameInfoIndex::BallSpeedY as i16); 
     }
 

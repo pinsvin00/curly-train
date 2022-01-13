@@ -12,35 +12,32 @@ use std::sync::mpsc;
 use termion::raw::IntoRawMode;
 use std::io::{stdout};
 use termion::input::TermRead;
+use std::io;
 
 use std::thread;
 
-
-
-pub struct Game {
+pub struct Game{
     paddle1: Rectangle,
     paddle2: Rectangle,
     ball: Ball,
-
     grid: Grid,
-
-    frame_interval: std::time::Duration,
     score_info_interval: std::time::Duration,
 
     ended: bool,
     score: Vec<u16>,
 
-    stdin : Option<termion::input::Keys<termion::AsyncReader>>,
-    stdout: Option<termion::raw::RawTerminal<std::io::Stdout>>,
+    stdin : termion::input::Keys<termion::AsyncReader>,
+    stdout: termion::raw::RawTerminal<std::io::Stdout>,
+
+    paddle_num : u8,
 
     rx : Receiver<GameInfo>,
     tx : Sender<GameInfo>,
 }
 
 impl Game {
-    pub fn new(x_size: usize, y_size: usize, host: bool, rx: Receiver<GameInfo>, tx : Sender<GameInfo>) -> Self { 
+    pub fn new(x_size: usize, y_size: usize, paddle_num : u8, tx : Sender<GameInfo>, rx: Receiver<GameInfo>,) -> Self { 
         let paddle_speed = 3;
-        
         return Self {
             paddle1: Rectangle {
                 id: 1, 
@@ -68,13 +65,12 @@ impl Game {
                     y: y_size as i16 / 2,
                 },
             },
-            stdin: None,
-            stdout: None,
-
+            stdin: termion::async_stdin().keys(),
+            stdout: stdout().into_raw_mode().unwrap(),
+            paddle_num,
             ended: false,
             ball: Ball::new(x_size/2, y_size/2),
             grid: Grid::new(x_size, y_size),
-            frame_interval: std::time::Duration::from_millis(25),
             score_info_interval: std::time::Duration::from_millis(2000),
             score: vec![0,0],
             tx,
@@ -108,34 +104,38 @@ impl Game {
         self.ball.scored = '-';
     }
 
-    // pub fn process_keys(&mut self) { 
-    //     let input = self.stdin.next();
+    pub fn process_keys(&mut self) { 
+        let input = self.stdin.next();
 
-    //     while !self.stdin.next().is_none() {
-    //         self.stdin.next();
-    //     }
+        while !self.stdin.next().is_none() {
+            self.stdin.next();
+        }
+        if let Some(Ok(key)) = input {
+            match key {
+                termion::event::Key::Char('q') => {
+                    self.end();
+                },
+                termion::event::Key::Char('w') => {
+                    if self.paddle_num == 1 {
+                        self.paddle1.move_paddle(-1);  
+                    }
+                    else {
+                        self.paddle2.move_paddle(-1)
+                    };
 
-    //     if let Some(Ok(key)) = input {
-    //         match key {
-    //             termion::event::Key::Char('q') => {
-    //                 self.end()
-    //             },
-    //             termion::event::Key::Up => {
-    //                 self.paddle1.move_paddle(-1);
-    //             },
-    //             termion::event::Key::Down => {
-    //                 self.paddle1.move_paddle(1);
-    //             },
-    //             termion::event::Key::Char('w') => {
-    //                 self.paddle2.move_paddle(-1);
-    //             },
-    //             termion::event::Key::Char('s') => {
-    //                 self.paddle2.move_paddle(1);
-    //             },
-    //             _ => {}
-    //         }
-    //     }
-    // }
+                },
+                termion::event::Key::Char('s') => {
+                    if self.paddle_num == 1 {
+                        self.paddle1.move_paddle(1);  
+                    }
+                    else {
+                        self.paddle2.move_paddle(1)
+                    };
+                },
+                _ => {}
+            }
+        }
+    }
 
     pub fn check_scores(&mut self) { 
         if self.ball.scored != '-' {
@@ -161,16 +161,18 @@ impl Game {
         }
     }
 
+    fn player_paddle(&mut self) -> &mut Rectangle {
+        if self.paddle_num == 1{
+            return &mut self.paddle1
+        }
+        else {
+            return &mut self.paddle2;
+        }
+    }
+
     fn load(&mut self, recv: GameInfo) {
         self.paddle1.position.y = recv.paddle1_pos;
         self.paddle2.position.y = recv.paddle2_pos;
-        
-
-        //todo check if data match
-        //`self.ball.position.x = r.ball_pos.x;
-        //`self.ball.position.y = r.ball_pos.y;
-        //`self.ball.movement.x = r.ball_speed.x;
-        //self.ball.movement.y = r.ball_speed.y;
     }
 
     fn dump_to_info(&self) -> GameInfo {
@@ -179,41 +181,53 @@ impl Game {
             ball_speed: self.ball.movement,
             paddle1_pos: self.paddle1.position.y,
             paddle2_pos: self.paddle2.position.y,
+            end_game: false,
         }
     }
 
     pub fn loop_logic(&mut self) {
 
-        //self.clear();
-        //self.process_keys();
+        self.clear();
+
+        let _result = self.tx.send(self.dump_to_info());
 
         let result = self.rx.recv();
 
         match result {
             Ok(game_info) => {
+                if game_info.end_game {
+                    self.end();
+                    return;
+                }
                 self.load(game_info);
             },
-            Err(err) => {
-                println!("{} err!", err);
-                std::process::exit(1);
+            Err(_) => {
+                self.end();
+                return;
             }
         }
 
+        self.process_keys();
+
         self.paddle1.draw(&mut self.grid);
         self.paddle2.draw(&mut self.grid);
+
         self.ball.draw(&mut self.grid);
         self.ball.move_shape();
 
         self.check_scores();
 
-        //self.grid.draw();
-        self.grid.clear();
 
-        let _result = self.tx.send(self.dump_to_info());
+        println!("p1 {:?}, p2: {:?}, ballm {:?}, ballp {:?} , Player : {}\r",
+         self.paddle1.position, self.paddle2.position, self.ball.movement, self.ball.position, self.paddle_num);
+
+        self.grid.draw();
+        self.grid.clear();
 
     }
     
-    fn end(&mut self) { 
+    fn end(&mut self) {
+        self.clear();
         self.ended = true;
     }
 }

@@ -30,8 +30,7 @@ mod game;
 use game::Game;
 
 mod utils;
-use utils::is_position_valid;
-use utils::get;
+use utils::*;
 use std::sync::Arc;
 
 extern crate termion;
@@ -39,7 +38,8 @@ extern crate termion;
 use std::io;
 
 // TODO:
-// Easy mode -> Leaving predicted trail where ball will land
+// Better interface for online gaming!
+// Make this code look cleaner
 // Online move
 // Sounds -> On hit
 // Graphics -> Colors
@@ -74,20 +74,20 @@ fn main() {
     let (tx_, rx_) = mpsc::channel();
 
     std::thread::spawn(move || {
-        println!("{}", host);
         let mut conn: Connection;
         if host {
-            conn = Connection::listener(tx_, rx_);    
+            conn = Connection::listener(tx, rx_);    
         }
         else { 
-            conn = Connection::connector(String::from("0.0.0.0:7999"), tx_, rx_).unwrap();
+            conn = Connection::connector(String::from("0.0.0.0:7999"), tx, rx_).unwrap();
         }
 
         conn.acquire();
     });
 
-    let mut game = Game::new(X_SIZE, Y_SIZE, host, rx, tx);
+    let mut game = Game::new(X_SIZE, Y_SIZE, (host as u8) + 1, tx_, rx);
     while !game.is_ended() { 
         game.loop_logic();
     }
+    switch_to_normal();
 }
