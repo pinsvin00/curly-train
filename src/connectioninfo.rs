@@ -34,9 +34,6 @@ impl ConnectionInfo {
             proto_ver: data[HandShakeInfo::ProtocolVer as usize].clone(),
         };
 
-        if info.proto_ver != PROTO_VER { 
-            return ParseInfo::Err;
-        }
 
         return ParseInfo::Ok(info);
     }

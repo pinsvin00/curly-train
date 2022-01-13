@@ -5,9 +5,10 @@ use crate::Grid;
 use crate::Ball;
 use crate::Vector2i;
 use crate::Connection;
-
+use crate::GameInfo;
+use std::sync::mpsc::{Receiver, Sender};
 use crate::Drawable;
-
+use std::sync::mpsc;
 use termion::raw::IntoRawMode;
 use std::io::{stdout};
 use termion::input::TermRead;
@@ -29,14 +30,17 @@ pub struct Game {
     ended: bool,
     score: Vec<u16>,
 
-    stdin : termion::input::Keys<termion::AsyncReader>,
-    stdout: termion::raw::RawTerminal<std::io::Stdout>,
+    stdin : Option<termion::input::Keys<termion::AsyncReader>>,
+    stdout: Option<termion::raw::RawTerminal<std::io::Stdout>>,
 
+    rx : Receiver<GameInfo>,
+    tx : Sender<GameInfo>,
 }
 
 impl Game {
-    pub fn new(x_size: usize, y_size: usize) -> Self { 
+    pub fn new(x_size: usize, y_size: usize, host: bool, rx: Receiver<GameInfo>, tx : Sender<GameInfo>) -> Self { 
         let paddle_speed = 3;
+        
         return Self {
             paddle1: Rectangle {
                 id: 1, 
@@ -64,8 +68,8 @@ impl Game {
                     y: y_size as i16 / 2,
                 },
             },
-            stdin: termion::async_stdin().keys(),
-            stdout: stdout().into_raw_mode().unwrap(),
+            stdin: None,
+            stdout: None,
 
             ended: false,
             ball: Ball::new(x_size/2, y_size/2),
@@ -73,8 +77,12 @@ impl Game {
             frame_interval: std::time::Duration::from_millis(25),
             score_info_interval: std::time::Duration::from_millis(2000),
             score: vec![0,0],
+            tx,
+            rx,
         } 
     }
+
+
     fn clear(&self) { 
         print!("{}", termion::clear::All);
     }
@@ -100,34 +108,34 @@ impl Game {
         self.ball.scored = '-';
     }
 
-    pub fn process_keys(&mut self) { 
-        let input = self.stdin.next();
+    // pub fn process_keys(&mut self) { 
+    //     let input = self.stdin.next();
 
-        while !self.stdin.next().is_none() {
-            self.stdin.next();
-        }
+    //     while !self.stdin.next().is_none() {
+    //         self.stdin.next();
+    //     }
 
-        if let Some(Ok(key)) = input {
-            match key {
-                termion::event::Key::Char('q') => {
-                    self.end()
-                },
-                termion::event::Key::Up => {
-                    self.paddle1.move_paddle(-1);
-                },
-                termion::event::Key::Down => {
-                    self.paddle1.move_paddle(1);
-                },
-                termion::event::Key::Char('w') => {
-                    self.paddle2.move_paddle(-1);
-                },
-                termion::event::Key::Char('s') => {
-                    self.paddle2.move_paddle(1);
-                },
-                _ => {}
-            }
-        }
-    }
+    //     if let Some(Ok(key)) = input {
+    //         match key {
+    //             termion::event::Key::Char('q') => {
+    //                 self.end()
+    //             },
+    //             termion::event::Key::Up => {
+    //                 self.paddle1.move_paddle(-1);
+    //             },
+    //             termion::event::Key::Down => {
+    //                 self.paddle1.move_paddle(1);
+    //             },
+    //             termion::event::Key::Char('w') => {
+    //                 self.paddle2.move_paddle(-1);
+    //             },
+    //             termion::event::Key::Char('s') => {
+    //                 self.paddle2.move_paddle(1);
+    //             },
+    //             _ => {}
+    //         }
+    //     }
+    // }
 
     pub fn check_scores(&mut self) { 
         if self.ball.scored != '-' {
@@ -153,27 +161,55 @@ impl Game {
         }
     }
 
+    fn load(&mut self, recv: GameInfo) {
+        self.paddle1.position.y = recv.paddle1_pos;
+        self.paddle2.position.y = recv.paddle2_pos;
+        
+
+        //todo check if data match
+        //`self.ball.position.x = r.ball_pos.x;
+        //`self.ball.position.y = r.ball_pos.y;
+        //`self.ball.movement.x = r.ball_speed.x;
+        //self.ball.movement.y = r.ball_speed.y;
+    }
+
+    fn dump_to_info(&self) -> GameInfo {
+        GameInfo {
+            ball_pos : self.ball.position,
+            ball_speed: self.ball.movement,
+            paddle1_pos: self.paddle1.position.y,
+            paddle2_pos: self.paddle2.position.y,
+        }
+    }
 
     pub fn loop_logic(&mut self) {
 
-        self.clear();
+        //self.clear();
+        //self.process_keys();
 
-        self.process_keys();
+        let result = self.rx.recv();
 
-        self.draw_helping_trail();
+        match result {
+            Ok(game_info) => {
+                self.load(game_info);
+            },
+            Err(err) => {
+                println!("{} err!", err);
+                std::process::exit(1);
+            }
+        }
 
         self.paddle1.draw(&mut self.grid);
         self.paddle2.draw(&mut self.grid);
         self.ball.draw(&mut self.grid);
         self.ball.move_shape();
 
-        
         self.check_scores();
 
-        self.grid.draw();
+        //self.grid.draw();
         self.grid.clear();
-        
-        thread::sleep(self.frame_interval);
+
+        let _result = self.tx.send(self.dump_to_info());
 
     }
     

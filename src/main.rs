@@ -18,6 +18,7 @@ use grid::Grid;
 
 mod connectioninfo;
 mod gameinfo;
+use gameinfo::GameInfo;
 
 mod connection;
 use connection::{Connection};
@@ -46,7 +47,7 @@ use std::io;
 
 
 fn convert_input_yn(info : &str) -> bool {
-    println!("{}",info);
+    println!("{}", info);
     let mut choice = String::new();
 
     io::stdin()
@@ -54,13 +55,11 @@ fn convert_input_yn(info : &str) -> bool {
         .expect("Failed to read line");
 
     choice = choice.to_ascii_uppercase();
-    println!("{}", choice);
     if choice == String::from("Y\n") { 
         return true;
     } else if choice == String::from("N\n"){
         return false;
     }
-
     return false;
 }
 
@@ -71,47 +70,24 @@ fn main() {
     println!("SUPER MEGA GIGA ULTRA PETA PONG SMGUPP!");
     let host = convert_input_yn("HOST? Y/N");
 
-
-    let mut game = Game::new(X_SIZE, Y_SIZE);
-
     let (tx, rx) = mpsc::channel();
+    let (tx_, rx_) = mpsc::channel();
 
-    let tx_clone = tx.clone();
-
-    println!("{}", host);
-
-    let handle = std::thread::spawn(move || {
-        let mut conn : Connection;
-        if host  {
-            println!("sus");
-            conn = Connection::listener();
+    std::thread::spawn(move || {
+        println!("{}", host);
+        let mut conn: Connection;
+        if host {
+            conn = Connection::listener(tx_, rx_);    
         }
-        else {
-            let addr = String::from("127.0.0.1:7999");
-            conn = Connection::connector(addr).unwrap();
-            conn.acquire();
+        else { 
+            conn = Connection::connector(String::from("0.0.0.0:7999"), tx_, rx_).unwrap();
         }
 
         conn.acquire();
-        conn.handshake();
-
-        loop {
-            conn.game_tick();
-            let copy = conn.curr_game_info.clone();
-            tx_clone.send(copy).unwrap();
-        } 
-        
     });
 
-    let res = handle.join();
-    
-
-
-    // let mut solo = convert_input_yn("Do you have a friend to play with? Y/N");
-
-
-    // while !game.is_ended() { 
-
-    //     game.loop_logic();
-    // }
+    let mut game = Game::new(X_SIZE, Y_SIZE, host, rx, tx);
+    while !game.is_ended() { 
+        game.loop_logic();
+    }
 }

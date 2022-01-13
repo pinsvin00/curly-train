@@ -1,4 +1,5 @@
 
+#[derive(Debug)]
 pub struct Vector2i {
     pub x: i16,
     pub y: i16
