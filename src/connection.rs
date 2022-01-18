@@ -3,7 +3,7 @@ use std::io::Write;
 use std::io::{BufReader};
 use std::io::prelude::*;
 use std::sync::mpsc::{Sender, Receiver};
-
+use std::net::SocketAddr;
 use crate::gameinfo::GameInfo;
 use crate::gamestate::GameState;
 use crate::switch_to_normal;
@@ -45,8 +45,10 @@ impl Connection {
     pub fn acquire(&mut self, conn_dispatcher : Sender<GameInfo>) {
         if !self.listening { 
 
-            let addr = self.ip_addr.as_ref();
-            let result = TcpStream::connect(String::from("0.0.0.0:7999"));
+            let mut ip_addr = self.ip_addr.clone().unwrap();
+            ip_addr.pop();
+            let server: SocketAddr = ip_addr.parse().expect("Cannot parse");
+            let result = TcpStream::connect(server);
             match result {
                 Ok(stream) => {
                     self.stream = Some(stream);
