@@ -11,6 +11,12 @@ pub struct Vector2f {
 }
 
 
+impl ToString for Vector2i {
+    fn to_string(&self) -> String {
+        return String::from(format!("{};{}", self.x, self.y))
+    }
+}
+
 impl Copy for Vector2f {}
 impl Copy for Vector2i { }
 

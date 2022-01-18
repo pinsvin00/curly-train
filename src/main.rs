@@ -16,9 +16,13 @@ use rect::Rectangle;
 mod grid;
 use grid::Grid;
 
-mod connectioninfo;
+mod gamestate;
+use gamestate::GCSignalType;
+use gamestate::GameState;
+
+
 mod gameinfo;
-use gameinfo::GameInfo;
+
 
 mod connection;
 use connection::{Connection};
@@ -31,19 +35,16 @@ use game::Game;
 
 mod utils;
 use utils::*;
-use std::sync::Arc;
 
 extern crate termion;
 
 use std::io;
 
-// TODO:
-// Better interface for online gaming!
-// Make this code look cleaner
-// Online move
-// Sounds -> On hit
-// Graphics -> Colors
-// Simple AI 
+// Known Issues
+/*
+    When ball has high speed collisions may not work properly.
+    Often desyncs
+*/
 
 
 fn convert_input_yn(info : &str) -> bool {
@@ -68,10 +69,19 @@ fn convert_input_yn(info : &str) -> bool {
 fn main() {
 
     println!("SUPER MEGA GIGA ULTRA PETA PONG SMGUPP!");
+
     let host = convert_input_yn("HOST? Y/N");
+    let mut ip_addr = String::new();
+
+    if !host {
+        io::stdin().read_line(&mut ip_addr).expect("Failed to read the line");   
+    }
+
 
     let (tx, rx) = mpsc::channel();
     let (tx_, rx_) = mpsc::channel();
+    let (conn_sender, conn_recv) = mpsc::channel();
+
 
     std::thread::spawn(move || {
         let mut conn: Connection;
@@ -79,13 +89,14 @@ fn main() {
             conn = Connection::listener(tx, rx_);    
         }
         else { 
-            conn = Connection::connector(String::from("0.0.0.0:7999"), tx, rx_).unwrap();
+            conn = Connection::connector(ip_addr, tx, rx_).unwrap();
         }
-
-        conn.acquire();
+        conn.acquire(conn_sender);
     });
 
-    let mut game = Game::new(X_SIZE, Y_SIZE, (host as u8) + 1, tx_, rx);
+    let mut game_info = conn_recv.recv().unwrap();
+    game_info.is_host = host;
+    let mut game = Game::new(game_info, (host as u8) + 1, tx_, rx);
     while !game.is_ended() { 
         game.loop_logic();
     }

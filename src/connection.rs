@@ -1,35 +1,29 @@
 use std::net::{TcpListener, TcpStream};
 use std::io::Write;
-use std::io::{BufReader, BufWriter};
+use std::io::{BufReader};
 use std::io::prelude::*;
 use std::sync::mpsc::{Sender, Receiver};
 
-use crate::connectioninfo::ConnectionInfo;
 use crate::gameinfo::GameInfo;
-use crate::Game;
+use crate::gamestate::GameState;
 use crate::switch_to_normal;
-use crate::Vector2i;
-use crate::utils::ParseInfo;
+use std::fs;
 
-const PROTO_VER : &str = "1.0.0";
 
 pub struct Connection {
     stream: Option<TcpStream>,
     ip_addr: Option<String>,
     listening: bool,
-    conn_info: Option<ConnectionInfo>,
-    pub curr_game_info: GameInfo,
-    thread_handle: Option<std::thread::JoinHandle<()>>,
-    tx : Sender<GameInfo>,
-    rx : Receiver <GameInfo>
+    pub curr_game_info: GameState,
+    tx : Sender<GameState>,
+    rx : Receiver <GameState>
 }
+
 impl Connection {
-    pub fn connector(ip_addr: String, tx: Sender<GameInfo>, rx : Receiver <GameInfo>) -> Option<Connection> {
+    pub fn connector(ip_addr: String, tx: Sender<GameState>, rx : Receiver <GameState>) -> Option<Connection> {
         return Some(Self {
-            thread_handle: None,
             ip_addr : Some(ip_addr),
-            conn_info : None,
-            curr_game_info : GameInfo::new(),
+            curr_game_info : GameState::new(),
             listening: false,
             stream : None,
             tx,
@@ -37,12 +31,10 @@ impl Connection {
         })
     }
 
-    pub fn listener(tx: Sender<GameInfo>, rx : Receiver <GameInfo>) -> Connection {
+    pub fn listener(tx: Sender<GameState>, rx : Receiver <GameState>) -> Connection {
         return Self {
-            thread_handle: None,
             ip_addr: None,
-            curr_game_info : GameInfo::new(),
-            conn_info: None,
+            curr_game_info : GameState::new(),
             listening: true,
             stream: None,
             tx,
@@ -50,66 +42,74 @@ impl Connection {
         }
     }
 
-    pub fn acquire(&mut self) {
+    pub fn acquire(&mut self, conn_dispatcher : Sender<GameInfo>) {
         if !self.listening { 
+
             let addr = self.ip_addr.as_ref();
-            self.stream = Some(TcpStream::connect(addr.unwrap()).unwrap());
-            self.handshake();
-            loop {
-                self.loop_game_tick();
-                std::thread::sleep(std::time::Duration::from_millis(50));
+            let result = TcpStream::connect(String::from("0.0.0.0:7999"));
+            match result {
+                Ok(stream) => {
+                    self.stream = Some(stream);
+                },
+                Err(err) => {
+                    print!("\r\nCannot connect to the socket, be sure that you've entered the valid ip address\r\n {}\r\n", err);
+                    switch_to_normal();
+                    std::process::exit(1);
+                },
+
             }
+
+            let mut reader = BufReader::new(self.stream.as_ref().unwrap());
+
+            let mut host_info_raw = String::new();
+            reader.read_line(&mut host_info_raw).unwrap();
+            host_info_raw.pop();
+
+            let game_info = GameInfo::parse(host_info_raw);
+
+            conn_dispatcher.send(game_info).unwrap();
+            self.loop_game_tick();
         }
 
         else { 
             let result = TcpListener::bind("127.0.0.1:7999");
-            let mut listener : TcpListener;
-
+            let listener;
             match result {
                 Ok(lis) => {
                     listener = lis;
                 },
                 Err(err) => {
-                    print!("err! : {} \r\n", err);
+                    print!("\r\nError occured whilst listening!\r\n {} \r\n", err);
                     switch_to_normal();
                     std::process::exit(1);
                 }
             }
 
-            for stream in listener.incoming() {
-                let s = stream.unwrap();
-                self.stream = Some(s);
-                self.handshake();
+            for s in listener.incoming() {
+
+                self.stream = Some(s.unwrap());
+
+                let mut stream = self.stream.as_ref().unwrap();
+                
+                let conny_path = String::from(std::env::current_dir().unwrap().to_str().unwrap()) + "/conny.sp";
+                let mut conn_data_raw = fs::read_to_string(conny_path).expect("Cannot open conny.sp!");
+                conn_data_raw.push_str("\n");
+
+
+                stream.write(conn_data_raw.as_bytes()).unwrap();
+
+
+                conn_data_raw.pop();
+                let game_info = GameInfo::parse(conn_data_raw);
+                conn_dispatcher.send(game_info).unwrap();
+
+ 
                 self.loop_game_tick();
             }
 
         }
     }
 
-    pub fn handshake(&mut self) -> ConnectionInfo { 
-        let conn_data = format!("{};{};{};{};{}\n", PROTO_VER, "test" ,"3" ,"2" ,"1" );
-        let mut stream = self.stream.as_ref().unwrap();
-        let mut reader = BufReader::new(stream);
-
-        stream.write(conn_data.as_bytes()).unwrap();
-
-        let conn_parse_info = ConnectionInfo::new(conn_data);
-        let mut conn_info;
-        match conn_parse_info { 
-            ParseInfo::Ok(_conn) => {
-                conn_info = _conn;
-            },
-            ParseInfo::Err => {
-                std::process::exit(1);
-            },
-        }
-
-        let mut response = String::new();
-        reader.read_line(&mut response).expect("Provided invalid data...");
-        response.pop();
-
-        return conn_info;
-    }
     
     pub fn loop_game_tick(&mut self) {
         loop {
@@ -124,40 +124,30 @@ impl Connection {
                 }
             }
 
-
-
             let packet = self.curr_game_info.str();
             let mut stream = self.stream.as_ref().unwrap();
             let mut reader = BufReader::new(stream);
 
 
+
             match stream.write(packet.as_bytes()) {
                 Ok(_) => {},
                 Err(_) => {
-                    self.curr_game_info.end_game = true;
-                    self.tx.send(self.curr_game_info);
+                    self.curr_game_info.terminate = true;
+                    self.tx.send(self.curr_game_info).unwrap();
                     break;
                 },
             }
+
             stream.flush().unwrap();
-
             let mut data_recv = String::new();
-
             reader.read_line(&mut data_recv).unwrap();
             data_recv.pop();
+
             self.curr_game_info.update(data_recv);
+            self.tx.send(self.curr_game_info).unwrap();
 
-
-            let result = self.tx.send(self.curr_game_info);
-            match result {
-                Err(e) => {
-                    println!("Critical tx error, terminating program. {}", e);
-                    std::process::exit(2);
-                },
-                Ok(_) => {},
-            }
-
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            std::thread::sleep(std::time::Duration::from_millis(50));
         }
     } 
 }

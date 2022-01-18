@@ -1,8 +1,4 @@
 use crate::Vector2i;
-
-
-use crate::X_SIZE;
-use crate::Y_SIZE;
 use crate::drawable::Drawable;
 use crate::get;
 use crate::is_position_valid;
@@ -59,7 +55,7 @@ fn get_shape(grid : &Vec<Vec<char>>, position: Vector2i) -> Vec<Vector2i> {
     }   
 
     impl Ball {
-        pub fn new(x: usize, y: usize) -> Ball {
+        pub fn new(x: usize, y: usize, mov: Vector2i) -> Ball {
             Self { 
                 position: Vector2i{
                     x:x as i16,
@@ -68,49 +64,20 @@ fn get_shape(grid : &Vec<Vec<char>>, position: Vector2i) -> Vec<Vector2i> {
                 draw_as_small: false,
                 collided: false,
                 scored: '-',
-                movement: Vector2i{
-                    x: -2,
-                    y: 1
-                },
+                movement: mov,
                 collision_place: Vector2i {
                     x: 0,
                     y:0,
                 }
             }
         }
-        pub fn move_shape(&mut self) {
-
-            self.position.x += self.movement.x;
-            self.position.y += self.movement.y;
-            
-            let x_bounds = [0, X_SIZE];
-            let y_bounds = [0, Y_SIZE];
-
-            let right_score = self.position.x < x_bounds[0] as i16;
-            let left_score = self.position.x > x_bounds[1] as i16;
-
-            if left_score || right_score  {
-                if left_score {
-                    self.scored = '1';
-                }
-                else {
-                    self.scored = '2';
-                }
-                self.movement.x *= -1;
-            }
-
-            for y_bound in y_bounds {
-                if (self.position.y - y_bound as i16).abs() == 0 { 
-                    self.movement.y *= -1;
-                    break;
-                } 
-            } 
-        }
     }
 
     impl Drawable for Ball {
         fn draw(&mut self, grid: &mut Grid) {
             let pos = self.position;
+
+            grid.set(self.position.x as usize, self.position.y as usize, '#');
 
             for dir in [[1,0], [-1, 0], [0, 1], [0, -1]] {
                 let x = pos.x + dir[0];
@@ -147,12 +114,7 @@ fn get_shape(grid : &Vec<Vec<char>>, position: Vector2i) -> Vec<Vector2i> {
                 }
                 self.movement.x *= -1;
                 self.collided = false;
-
             }
-
-
-
-
         }
     }
 

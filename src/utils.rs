@@ -1,6 +1,5 @@
 use crate::X_SIZE;
 use crate::Y_SIZE;
-use std::io::stdout;
 use crate::Vector2i;
 
 pub fn is_position_valid(grid : &Vec<Vec<char>>, position: Vector2i) -> bool {
@@ -33,18 +32,4 @@ pub fn switch_to_normal() {
         termion::cursor::Show,
         termion::clear::AfterCursor
     );
-}
-
-pub enum ParseInfo<T> {
-    Ok(T),
-    Err,
-}
-
-
-pub enum HandShakeInfo {
-    ProtocolVer = 0,
-    ConnectorIP = 1,
-    PaddleSpeed = 2,
-    BallSpeedX  = 3,
-    BallSpeedY  = 4,
 }

@@ -1,69 +1,65 @@
 
-
 use crate::vector::Vector2i;
 
-#[derive(Debug)]
-pub struct GameInfo { 
-    pub paddle1_pos: i16,
-    pub paddle2_pos: i16,
-    pub ball_pos: Vector2i,
+pub struct GameInfo {
+    pub _proto_ver: String,
+    pub _ip_addr: String,
+    pub is_host: bool,
+    pub paddle_speed: u8,
     pub ball_speed: Vector2i,
-    pub end_game: bool,
-}
-
-enum GameInfoIndex { 
-    Paddle1PosY = 0,
-    Paddle2PosY = 1,
-    BallPosX    = 2,
-    BallPosY    = 3,
-    BallSpeedX  = 4,
-    BallSpeedY  = 5,
-}
-
-fn get_info_split(info_split : &Vec<&str>, index: i16) -> i16 {
-    return info_split[index as usize].parse::<i16>().unwrap();
-}
-
-impl Copy for GameInfo {}
-
-impl Clone for GameInfo  {
-    fn clone(&self) -> GameInfo{
-        *self
-    }
+    pub board_size: Vector2i,
+    pub draw_helping_trail: bool,
 }
 
 impl GameInfo {
-    pub fn new() -> GameInfo {
-        return GameInfo {
-            paddle1_pos: 0,
-            paddle2_pos: 0,
-            ball_pos: Vector2i {
-                x: 0,
-                y: 0,
+    pub fn parse(data_raw: String) -> GameInfo {
+
+        let data : Vec<String> = data_raw.split(';').map(String::from).collect();
+
+        if data.len() != 7 {
+            print!("Invalid conny.sp content.");
+            std::process::exit(2);
+        }
+
+
+        let mut info = GameInfo {
+            is_host: false,
+            ball_speed: Vector2i { 
+                x: 1,
+                y: 2,
             },
-            ball_speed: Vector2i {
-                x: 0,
-                y: 0,
+            board_size: Vector2i {
+                x: 270,
+                y: 45,
             },
-            end_game: false,
+            _ip_addr: String::from(""),
+            paddle_speed: 0,
+            _proto_ver: String::from("1"),
+            draw_helping_trail: false,
         };
+
+    
+        info._proto_ver   = data[0].clone();
+
+        info.ball_speed.x = data[1].parse::<i16>().unwrap();
+        info.ball_speed.y = data[2].parse::<i16>().unwrap();
+
+        info.board_size.x = data[3].parse::<i16>().unwrap();
+        info.board_size.y = data[4].parse::<i16>().unwrap();
+
+        info.paddle_speed = data[5].parse::<u8>().unwrap();
+
+        info.draw_helping_trail = data[6].parse::<u8>().unwrap() == 1;
+
+
+        return info;
     }
+}
 
-    pub fn update(&mut self, info_raw: String) {
-        let info_split: Vec<&str> = info_raw.split(";").collect();
-
-        self.paddle1_pos = get_info_split(&info_split, GameInfoIndex::Paddle1PosY as i16); 
-        self.paddle2_pos = get_info_split(&info_split, GameInfoIndex::Paddle2PosY as i16); 
-        
-        self.ball_pos.x = get_info_split(&info_split, GameInfoIndex::BallPosX as i16); 
-        self.ball_pos.y = get_info_split(&info_split, GameInfoIndex::BallPosY as i16);
-
-        self.ball_speed.x = get_info_split(&info_split, GameInfoIndex::BallSpeedX as i16); 
-        self.ball_speed.y = get_info_split(&info_split, GameInfoIndex::BallSpeedY as i16); 
-    }
-
-    pub fn str(&self) -> String {
-        return format!("{};{};{};{};{};{}\n",
-         self.paddle1_pos, self.paddle2_pos, self.ball_pos.x, self.ball_pos.y, self.ball_speed.x, self.ball_speed.y);
+impl ToString for GameInfo {
+    fn to_string(&self) -> String {
+        return String::from(
+            format!("{};{};{};{}\n", self._proto_ver, self.ball_speed.to_string(), self.board_size.to_string(), self.paddle_speed)
+        );
     }
 }
