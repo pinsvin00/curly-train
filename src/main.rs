@@ -74,7 +74,11 @@ fn main() {
     let mut ip_addr = String::new();
 
     if !host {
-        io::stdin().read_line(&mut ip_addr).expect("Failed to read the line");   
+        println!("Please type in address you want to connect to eg. 127.0.01:7999");
+        io::stdin().read_line(&mut ip_addr).expect("Failed to read the line");  
+    }
+    else {
+        println!("Waiting for connection...");
     }
 
 
